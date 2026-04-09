@@ -1,0 +1,14 @@
+[Unit]
+Description=Sync GNOME Pomodoro dark theme with DMS mode
+After=dms.service graphical-session.target
+Wants=dms.service
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/pomodoro-dms-theme-sync
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=graphical-session.target

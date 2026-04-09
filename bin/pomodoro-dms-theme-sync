@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+readonly SETTINGS_SCHEMA="org.gnome.pomodoro.preferences"
+readonly SETTINGS_KEY="enabled-plugins"
+readonly POLL_SECONDS="${POLL_SECONDS:-2}"
+
+sync_once() {
+    local mode plugins updated
+
+    mode="$(dms ipc theme getMode | tr -d '\r\n' | tr '[:upper:]' '[:lower:]')"
+    if [[ "${mode}" != "dark" && "${mode}" != "light" ]]; then
+        echo "Unexpected DMS mode: ${mode}" >&2
+        return 1
+    fi
+
+    plugins="$(gsettings get "${SETTINGS_SCHEMA}" "${SETTINGS_KEY}")"
+    updated="$(
+        python - "${plugins}" "${mode}" <<'PY'
+import ast
+import sys
+
+plugins = ast.literal_eval(sys.argv[1])
+mode = sys.argv[2]
+
+if not isinstance(plugins, list):
+    raise SystemExit("enabled-plugins is not a list")
+
+base = [p for p in plugins if p != "dark-theme"]
+if mode == "dark":
+    base.append("dark-theme")
+
+if base != plugins:
+    print("[" + ", ".join(repr(x) for x in base) + "]")
+PY
+    )"
+
+    if [[ -n "${updated}" ]]; then
+        gsettings set "${SETTINGS_SCHEMA}" "${SETTINGS_KEY}" "${updated}"
+    fi
+}
+
+sync_once
+while sleep "${POLL_SECONDS}"; do
+    sync_once
+done
